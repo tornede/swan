@@ -1,22 +1,15 @@
 package de.fraunhofer.iem.swan;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Properties;
-import java.util.Random;
-import java.util.Set;
-
+import ai.libs.jaicore.ml.weka.classification.learner.IWekaClassifier;
+import ai.libs.jaicore.ml.weka.dataset.IWekaInstances;
+import ai.libs.jaicore.ml.weka.dataset.WekaInstances;
+import ai.libs.mlplan.core.MLPlan;
+import ai.libs.mlplan.multiclass.wekamlplan.MLPlanWekaBuilder;
 import de.fraunhofer.iem.swan.data.Category;
 import de.fraunhofer.iem.swan.data.Method;
 import de.fraunhofer.iem.swan.util.SwanConfig;
+import org.api4.java.algorithm.Timeout;
+import weka.classifiers.Classifier;
 import weka.classifiers.Evaluation;
 import weka.classifiers.bayes.BayesNet;
 import weka.classifiers.bayes.NaiveBayes;
@@ -27,13 +20,15 @@ import weka.classifiers.rules.JRip;
 import weka.classifiers.rules.OneR;
 import weka.classifiers.trees.DecisionStump;
 import weka.classifiers.trees.J48;
-import weka.core.Attribute;
-import weka.core.FastVector;
-import weka.core.Instance;
-import weka.core.Instances;
-import weka.core.Range;
+import weka.core.*;
 import weka.core.converters.ArffSaver;
 import weka.filters.unsupervised.attribute.Remove;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Finds possible sources and sinks in a given set of system methods using a
@@ -43,7 +38,7 @@ import weka.filters.unsupervised.attribute.Remove;
  */
 public class Learner {
 
-    private final static String WEKA_LEARNER_ALL = "SMO";
+    private final static String WEKA_LEARNER_ALL = "ML_PLAN";
     private long startAnalysisTime;
     private long analysisTime;
 
@@ -211,6 +206,8 @@ public class Learner {
                 classifier.setClassifier(new OneR());
             else if (WEKA_LEARNER_ALL.equals("Logistic"))
                 classifier.setClassifier(new Logistic());
+            else if (WEKA_LEARNER_ALL.equals("ML_PLAN"))
+                classifier.setClassifier(createMlPlanBasedClassifier(trainInstances, testInstances));
             else
                 throw new Exception("Wrong WEKA learner!");
             // System.out.println("Classifier created: " + WEKA_LEARNER_ALL);
@@ -324,5 +321,41 @@ public class Learner {
         val = val * (10 * decimals);
         val = Math.round(val);
         return val / (10 * decimals);
+    }
+
+    public Classifier createMlPlanBasedClassifier(Instances trainingInstances, Instances testingInstances) throws Exception {
+        /* load data for segment dataset and create a train-test-split */
+        long start = System.currentTimeMillis();
+
+        IWekaInstances trainingData = new WekaInstances(trainingInstances);
+        IWekaInstances testData = new WekaInstances(testingInstances);
+
+        /* initialize mlplan with a tiny search space, and let it run for 30 seconds */
+        MLPlanWekaBuilder builder = new MLPlanWekaBuilder();
+        builder.withNodeEvaluationTimeOut(new Timeout(30, TimeUnit.SECONDS));
+        builder.withCandidateEvaluationTimeOut(new Timeout(10, TimeUnit.SECONDS));
+        builder.withTimeOut(new Timeout(30, TimeUnit.SECONDS));
+        builder.withNumCpus(4);
+
+        MLPlan<IWekaClassifier> mlplan = builder.withDataset(trainingData).build();
+        mlplan.setPortionOfDataForPhase2(0f);
+        mlplan.setLoggerName("testedalgorithm");
+
+        Classifier optimizedClassifier = null;
+
+        try {
+            start = System.currentTimeMillis();
+            optimizedClassifier = mlplan.call().getClassifier();
+            long trainTime = (int) (System.currentTimeMillis() - start) / 1000;
+
+            /* evaluate solution produced by mlplan */
+            Evaluation eval = new Evaluation(trainingData.getInstances());
+            eval.evaluateModel(optimizedClassifier, testData.getInstances());
+            System.out.println("Error rate: " + ((100 - eval.pctCorrect())));
+            //LOGGER.info("Error Rate of the solution produced by ML-Plan: {}. Internally believed error was {}", ((100 - eval.pctCorrect()) / 100f), mlplan.getInternalValidationErrorOfSelectedClassifier());
+        } catch (NoSuchElementException e) {
+            //LOGGER.error("Building the classifier failed.", e);
+        }
+        return optimizedClassifier;
     }
 }

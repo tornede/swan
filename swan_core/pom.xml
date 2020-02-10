@@ -77,7 +77,23 @@
             <artifactId>jdom2</artifactId>
             <version>2.0.6</version>
         </dependency>
-    </dependencies>
+		<!-- https://mvnrepository.com/artifact/org.openjfx/javafx -->
+		<dependency>
+			<groupId>org.openjfx</groupId>
+			<artifactId>javafx-controls</artifactId>
+			<version>11</version>
+			<!--<type>pom</type>-->
+		</dependency>
+
+		<dependency>
+			<groupId>com.github.fmohr</groupId>
+			<artifactId>AILibs</artifactId>
+			<version>0.2.0</version>
+		</dependency>
+
+
+
+	</dependencies>
 
 	<distributionManagement>
 		<snapshotRepository>
@@ -92,6 +108,24 @@
 
 	<repositories>
 		<repository>
+			<id>mjitpack</id>
+			<name>your custom repo</name>
+			<url>https://jitpack.io</url>
+		</repository>
+
+		<repository>
+			<id>clojars</id>
+			<name>your custom repo</name>
+			<url>http://clojars.org/repo/</url>
+		</repository>
+
+		<repository>
+			<id>maven</id>
+			<name>your custom repo</name>
+			<url>https://repo1.maven.org/maven2/</url>
+		</repository>
+
+		<repository>
 			<id>soot-snapshot</id>
 			<name>soot snapshot</name>
 			<url>https://soot-build.cs.uni-paderborn.de/nexus/repository/soot-snapshot/</url>
@@ -99,6 +133,7 @@
 				<enabled>false</enabled>
 			</releases>
 		</repository>
+
 		<repository>
 			<id>soot-release</id>
 			<name>soot release</name>
@@ -107,6 +142,7 @@
 				<enabled>false</enabled>
 			</snapshots>
 		</repository>
+
 	</repositories>
 
 	<build>
@@ -167,6 +203,14 @@
 						</configuration>
 					</execution>
 				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.openjfx</groupId>
+				<artifactId>javafx-maven-plugin</artifactId>
+				<version>0.0.3</version>
+				<!--<configuration>
+					<mainClass>HelloFX</mainClass>
+				</configuration>-->
 			</plugin>
 		</plugins>
 	</build>
